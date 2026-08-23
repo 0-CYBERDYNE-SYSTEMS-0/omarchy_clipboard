@@ -1,0 +1,276 @@
+#!/usr/bin/env node
+
+const fs = require("fs")
+const os = require("os")
+const path = require("path")
+const { spawnSync } = require("child_process")
+const H = require("../ClipboardHistory.js")
+
+const STATE_DIR = path.join(process.env.XDG_STATE_HOME || path.join(os.homedir(), ".local/state"), "omarchy")
+const HISTORY_PATH = path.join(STATE_DIR, "clipboard-history.json")
+const EXTRAS_PATH = path.join(STATE_DIR, "clipboard-extras.json")
+
+function usage() {
+  console.log(`Usage:
+  omarchy-clips search [query]
+  omarchy-clips list [--kind <kind>] [--board <board>] [--pinned] [--snippets]
+  omarchy-clips show <index|id>
+  omarchy-clips pin <index|id>
+  omarchy-clips unpin <index|id>
+  omarchy-clips snippet <index|id>
+  omarchy-clips board <index|id> <name>
+  omarchy-clips boards
+  omarchy-clips paste <index|id>
+  omarchy-clips copy <index|id>
+  omarchy-clips stack
+  omarchy-clips stack add <index|id>
+  omarchy-clips stack paste
+  omarchy-clips stack clear
+
+Indexes are 1-based from the current filtered list (search/list).
+Ids are stable and preferred for scripts.
+
+Kinds: text, url, color, code, file, image, snippet`)
+}
+
+function readJson(file, fallback) {
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8"))
+  } catch (e) {
+    return fallback
+  }
+}
+
+function writeJson(file, value) {
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  const tmp = file + ".tmp." + process.pid
+  fs.writeFileSync(tmp, JSON.stringify(value, null, 2) + "\n")
+  fs.renameSync(tmp, file)
+}
+
+function loadHistory() {
+  return H.parseHistory(JSON.stringify(readJson(HISTORY_PATH, [])))
+}
+
+function loadState() {
+  return H.parseState(JSON.stringify(readJson(EXTRAS_PATH, {})))
+}
+
+function saveHistory(history) {
+  writeJson(HISTORY_PATH, history)
+}
+
+function saveState(state) {
+  writeJson(EXTRAS_PATH, state)
+}
+
+function parseListOptions(args) {
+  const opts = { board: "all", kind: "", pinnedOnly: false, snippetOnly: false }
+  const rest = []
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]
+    if (a === "--kind") opts.kind = String(args[++i] || "")
+    else if (a === "--board") opts.board = String(args[++i] || "all")
+    else if (a === "--pinned") opts.pinnedOnly = true
+    else if (a === "--snippets") opts.snippetOnly = true
+    else rest.push(a)
+  }
+  return { opts, rest }
+}
+
+function rowsFrom(history, query, opts, state) {
+  return H.displayRows(history, query || "", 100, Object.assign({
+    stackIds: state.stack
+  }, opts))
+}
+
+function resolveTarget(history, rows, token) {
+  const raw = String(token || "")
+  if (!raw) return -1
+  const byId = H.findIndexById(history, raw)
+  if (byId >= 0) return byId
+  if (/^\d+$/.test(raw)) {
+    const n = Number(raw)
+    if (n >= 1 && n <= rows.length) return rows[n - 1].index
+    if (n >= 0 && n < history.length) return n
+  }
+  return -1
+}
+
+function printRows(rows) {
+  if (rows.length === 0) {
+    console.log("(no clips)")
+    return
+  }
+  rows.forEach((row, i) => {
+    const flags = [
+      row.pinned ? "pin" : "",
+      row.snippet ? "snip" : "",
+      row.inStack ? "stack" : "",
+      row.board ? row.board : ""
+    ].filter(Boolean).join(",")
+    const preview = String(row.previewText || "").slice(0, 90)
+    console.log(
+      String(i + 1).padStart(3) + "  " +
+      (row.id || "").padEnd(10) + "  " +
+      String(row.kind || "").padEnd(8) + "  " +
+      (flags ? "[" + flags + "] " : "") +
+      preview
+    )
+  })
+}
+
+function showEntry(entry, index) {
+  if (!entry) {
+    console.error("not found")
+    process.exit(1)
+  }
+  console.log("index\t" + index)
+  console.log("id\t" + (entry.id || ""))
+  console.log("type\t" + entry.type)
+  console.log("kind\t" + (entry.kind || ""))
+  console.log("pinned\t" + (!!entry.pinned))
+  console.log("snippet\t" + (!!entry.snippet))
+  console.log("board\t" + (entry.board || "inbox"))
+  console.log("captured\t" + (entry.capturedAt || ""))
+  if (entry.type === "image") {
+    console.log("mime\t" + entry.mime)
+    console.log("path\t" + entry.path)
+  } else {
+    console.log("---")
+    process.stdout.write(entry.text)
+    if (!String(entry.text).endsWith("\n")) process.stdout.write("\n")
+  }
+}
+
+function run(cmd, args, opts) {
+  const result = spawnSync(cmd, args, Object.assign({ stdio: "inherit" }, opts || {}))
+  if (result.error) throw result.error
+  return result.status || 0
+}
+
+function pasteEntry(entry, copyOnly) {
+  if (!entry) {
+    console.error("not found")
+    process.exit(1)
+  }
+  if (entry.type === "image") {
+    const args = copyOnly ? ["--copy-only", entry.mime, entry.path] : [entry.mime, entry.path]
+    return run("omarchy-clipboard-paste-file", args)
+  }
+  const args = copyOnly
+    ? ["--copy-only", "--history-index", String(H.findIndexById(loadHistory(), entry.id))]
+    : ["--shift-insert", "--history-index", String(H.findIndexById(loadHistory(), entry.id))]
+  return run("omarchy-clipboard-paste-text", args)
+}
+
+function mutate(token, fn) {
+  const history = loadHistory()
+  const state = loadState()
+  const rows = rowsFrom(history, "", { board: "all" }, state)
+  const index = resolveTarget(history, rows, token)
+  if (index < 0) {
+    console.error("not found: " + token)
+    process.exit(1)
+  }
+  const next = fn(history, index)
+  saveHistory(next)
+  const entry = next[index] || next[H.findIndexById(next, history[index] && history[index].id)] || next[0]
+  if (entry) {
+    console.log((entry.id || "") + "\t" + (entry.kind || "") + "\t" + (entry.board || "inbox") + "\t" + (entry.pinned ? "pinned" : "") + (entry.snippet ? " snippet" : ""))
+  }
+}
+
+const argv = process.argv.slice(2)
+const cmd = argv[0] || "list"
+
+if (cmd === "-h" || cmd === "--help") {
+  usage()
+  process.exit(0)
+}
+
+if (cmd === "search") {
+  const history = loadHistory()
+  const state = loadState()
+  printRows(rowsFrom(history, argv.slice(1).join(" "), { board: "all" }, state))
+} else if (cmd === "list") {
+  const parsed = parseListOptions(argv.slice(1))
+  const history = loadHistory()
+  const state = loadState()
+  printRows(rowsFrom(history, parsed.rest.join(" "), parsed.opts, state))
+} else if (cmd === "show") {
+  const history = loadHistory()
+  const state = loadState()
+  const rows = rowsFrom(history, "", { board: "all" }, state)
+  const index = resolveTarget(history, rows, argv[1])
+  showEntry(index >= 0 ? history[index] : null, index)
+} else if (cmd === "pin") {
+  mutate(argv[1], (history, index) => H.setPinned(history, index, true))
+} else if (cmd === "unpin") {
+  mutate(argv[1], (history, index) => H.setPinned(history, index, false))
+} else if (cmd === "snippet") {
+  mutate(argv[1], (history, index) => H.setSnippet(history, index, true))
+} else if (cmd === "board") {
+  mutate(argv[1], (history, index) => H.setBoard(history, index, argv[2] || ""))
+} else if (cmd === "boards") {
+  const history = loadHistory()
+  const state = loadState()
+  const boards = H.collectBoards(history, state.boards)
+  console.log("all")
+  console.log("inbox")
+  boards.forEach((b) => console.log(b))
+} else if (cmd === "paste") {
+  const history = loadHistory()
+  const state = loadState()
+  const rows = rowsFrom(history, "", { board: "all" }, state)
+  const index = resolveTarget(history, rows, argv[1])
+  process.exit(pasteEntry(index >= 0 ? history[index] : null, false))
+} else if (cmd === "copy") {
+  const history = loadHistory()
+  const state = loadState()
+  const rows = rowsFrom(history, "", { board: "all" }, state)
+  const index = resolveTarget(history, rows, argv[1])
+  process.exit(pasteEntry(index >= 0 ? history[index] : null, true))
+} else if (cmd === "stack") {
+  const sub = argv[1] || "list"
+  let history = loadHistory()
+  let state = loadState()
+  if (sub === "list") {
+    const rows = H.stackEntries(history, state).map((item) => {
+      const display = H.displayRows([item.entry], "", 1, { stackIds: [item.entry.id] })[0]
+      return display
+    }).filter(Boolean)
+    printRows(rows)
+  } else if (sub === "add") {
+    const rows = rowsFrom(history, "", { board: "all" }, state)
+    const index = resolveTarget(history, rows, argv[2])
+    if (index < 0 || !history[index] || !history[index].id) {
+      console.error("not found: " + argv[2])
+      process.exit(1)
+    }
+    state = H.toggleStack(state, history[index].id)
+    saveState(state)
+    console.log(state.stack.join("\n") || "(empty)")
+  } else if (sub === "clear") {
+    state = H.clearStack(state)
+    saveState(state)
+    console.log("(empty)")
+  } else if (sub === "paste") {
+    const items = H.stackEntries(history, state)
+    if (items.length === 0) {
+      console.error("stack is empty")
+      process.exit(1)
+    }
+    for (let i = 0; i < items.length; i++) {
+      const status = pasteEntry(items[i].entry, false)
+      if (status !== 0) process.exit(status)
+    }
+    saveState(H.clearStack(state))
+  } else {
+    usage()
+    process.exit(1)
+  }
+} else {
+  usage()
+  process.exit(1)
+}

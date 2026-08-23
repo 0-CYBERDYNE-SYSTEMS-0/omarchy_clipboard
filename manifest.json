@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "cyberdyne.clipboard",
+  "name": "Clipboard",
+  "version": "2.0.0",
+  "author": "0-CYBERDYNE-SYSTEMS-0",
+  "license": "MIT",
+  "description": "Clipboard history with search, pins, boards, snippets, typed cards, and a stack.",
+  "kinds": [
+    "overlay"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "overlay": "Clipboard.qml"
+  },
+  "omarchy": {
+    "clonedFrom": "omarchy.clipboard"
+  }
+}
