@@ -6,6 +6,8 @@ Plugin id: `io.github.0-cyberdyne-systems-0.paste`. MIT. Independent community p
 
 No sudo or pkexec. No network calls. No extra packages.
 
+<p align="center"><img src="preview.png" alt="Paste overlay with boards, type chips, pins, and a preview pane" width="900"></p>
+
 ## Install
 
 ```sh
