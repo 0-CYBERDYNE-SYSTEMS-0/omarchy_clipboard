@@ -8,24 +8,24 @@ const H = require("../ClipboardHistory.js")
 
 const STATE_DIR = path.join(process.env.XDG_STATE_HOME || path.join(os.homedir(), ".local/state"), "omarchy")
 const HISTORY_PATH = path.join(STATE_DIR, "clipboard-history.json")
-const PASTE_STATE_PATH = path.join(STATE_DIR, "clipboard-paste.json")
+const EXTRAS_PATH = path.join(STATE_DIR, "clipboard-extras.json")
 
 function usage() {
   console.log(`Usage:
-  omarchy-paste search [query]
-  omarchy-paste list [--kind <kind>] [--board <board>] [--pinned] [--snippets]
-  omarchy-paste show <index|id>
-  omarchy-paste pin <index|id>
-  omarchy-paste unpin <index|id>
-  omarchy-paste snippet <index|id>
-  omarchy-paste board <index|id> <name>
-  omarchy-paste boards
-  omarchy-paste paste <index|id>
-  omarchy-paste copy <index|id>
-  omarchy-paste stack
-  omarchy-paste stack add <index|id>
-  omarchy-paste stack paste
-  omarchy-paste stack clear
+  omarchy-clips search [query]
+  omarchy-clips list [--kind <kind>] [--board <board>] [--pinned] [--snippets]
+  omarchy-clips show <index|id>
+  omarchy-clips pin <index|id>
+  omarchy-clips unpin <index|id>
+  omarchy-clips snippet <index|id>
+  omarchy-clips board <index|id> <name>
+  omarchy-clips boards
+  omarchy-clips paste <index|id>
+  omarchy-clips copy <index|id>
+  omarchy-clips stack
+  omarchy-clips stack add <index|id>
+  omarchy-clips stack paste
+  omarchy-clips stack clear
 
 Indexes are 1-based from the current filtered list (search/list).
 Ids are stable and preferred for scripts.
@@ -53,7 +53,7 @@ function loadHistory() {
 }
 
 function loadState() {
-  return H.parseState(JSON.stringify(readJson(PASTE_STATE_PATH, {})))
+  return H.parseState(JSON.stringify(readJson(EXTRAS_PATH, {})))
 }
 
 function saveHistory(history) {
@@ -61,7 +61,7 @@ function saveHistory(history) {
 }
 
 function saveState(state) {
-  writeJson(PASTE_STATE_PATH, state)
+  writeJson(EXTRAS_PATH, state)
 }
 
 function parseListOptions(args) {

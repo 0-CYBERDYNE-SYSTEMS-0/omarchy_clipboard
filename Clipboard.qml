@@ -25,12 +25,12 @@ Item {
   property string promptText: ""
 
   property string historyPath: Quickshell.env("HOME") + "/.local/state/omarchy/clipboard-history.json"
-  property string statePath: Quickshell.env("HOME") + "/.local/state/omarchy/clipboard-paste.json"
+  property string statePath: Quickshell.env("HOME") + "/.local/state/omarchy/clipboard-extras.json"
   property string pluginDir: (root.manifest && root.manifest.__sourceDir)
     ? String(root.manifest.__sourceDir)
-    : (Quickshell.env("HOME") + "/.config/omarchy/plugins/io.github.0-cyberdyne-systems-0.paste")
+    : (Quickshell.env("HOME") + "/.config/omarchy/plugins/io.github.0-cyberdyne-systems-0.clipboard")
   property string captureScript: root.pluginDir + "/capture.sh"
-  property string pasteBin: root.pluginDir + "/bin/omarchy-paste"
+  property string pasteBin: root.pluginDir + "/bin/omarchy-clips"
   property var kindChipIds: ["all", "pins", "text", "url", "image", "color", "code", "file", "snippet"]
 
   property color background: Color.menu.background

@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "id": "io.github.0-cyberdyne-systems-0.paste",
-  "name": "Paste",
+  "id": "io.github.0-cyberdyne-systems-0.clipboard",
+  "name": "Clipboard",
   "version": "2.0.0",
   "author": "0-CYBERDYNE-SYSTEMS-0",
   "license": "MIT",
-  "description": "Paste-style clipboard history with search, pins, boards, snippets, typed cards, and a stack.",
+  "description": "Clipboard history with search, pins, boards, snippets, typed cards, and a stack.",
   "kinds": [
     "overlay"
   ],
