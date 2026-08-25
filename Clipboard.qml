@@ -42,15 +42,21 @@ Item {
   property color selectedText: Color.menu.selectedText
   readonly property int cornerRadius: Style.cornerRadius
   property string fontFamily: Style.font.menuFamily
-  property int contentMargin: Style.spacing.panelPadding
-  property int headerHeight: Math.max(Style.space(34), Style.font.title + Style.spacing.controlPaddingY * 2)
-  property int chipHeight: Math.max(Style.space(26), Style.font.caption + Style.spacing.sm)
+  property real textScale: 1.5
+  readonly property int fontCaption: Math.round(Style.font.caption * textScale)
+  readonly property int fontBody: Math.round(Style.font.body * textScale)
+  readonly property int fontTitle: Math.round(Style.font.title * textScale)
+  readonly property int fontHeading: Math.round(Style.font.heading * textScale)
+  readonly property int fontDisplay: Math.round(Style.font.displayLarge * textScale)
+  property int contentMargin: Style.spacing.panelPadding + Style.space(6)
+  property int headerHeight: Math.max(Style.space(48), root.fontHeading + Style.spacing.controlPaddingY * 2)
+  property int chipHeight: Math.max(Style.space(36), root.fontCaption + Style.spacing.sm)
   property int contentSpacing: Style.spacing.md
-  property int cardWidth: Math.min(Style.space(980), panel.width - Style.gapsOut * 2)
-  property int cardHeight: Math.min(Style.space(640), panel.height - Style.gapsOut * 2)
-  property int sidebarWidth: Style.space(148)
-  property int rowHeight: Math.max(Style.space(58), Style.font.body + Style.font.caption + Style.spacing.rowPaddingX * 2)
-  property int footerHeight: Math.max(Style.space(22), Style.font.caption + Style.spacing.xs)
+  property int cardWidth: Math.min(Style.space(1400), panel.width - Style.gapsOut * 2)
+  property int cardHeight: Math.min(Style.space(880), panel.height - Style.gapsOut * 2)
+  property int sidebarWidth: Style.space(200)
+  property int rowHeight: Math.max(Style.space(78), root.fontTitle + root.fontCaption + Style.spacing.rowPaddingX * 2)
+  property int footerHeight: Math.max(Style.space(32), root.fontCaption + Style.spacing.xs)
   property int historyLimit: 300
 
   function kindChipLabel(id) {
@@ -677,7 +683,7 @@ Item {
             color: root.foreground
             opacity: (root.promptMode ? root.promptText : root.filterText) ? 1 : 0.58
             font.family: root.fontFamily
-            font.pixelSize: Style.font.heading
+            font.pixelSize: root.fontHeading
             elide: Text.ElideRight
           }
         }
@@ -713,7 +719,7 @@ Item {
                   text: root.kindChipLabel(parent.modelData)
                   color: parent.selected ? root.selectedText : root.foreground
                   font.family: root.fontFamily
-                  font.pixelSize: Style.font.caption
+                  font.pixelSize: root.fontCaption
                 }
 
                 MouseArea {
@@ -755,7 +761,7 @@ Item {
                   readonly property bool selected: root.filterBoard === boardId
 
                   width: ListView.view.width
-                  height: Math.max(Style.space(28), Style.font.body + Style.spacing.sm)
+                  height: Math.max(Style.space(36), root.fontBody + Style.spacing.sm)
                   radius: root.cornerRadius
                   color: selected ? root.selectedBackground : "transparent"
 
@@ -766,7 +772,7 @@ Item {
                     text: label
                     color: parent.selected ? root.selectedText : root.foreground
                     font.family: root.fontFamily
-                    font.pixelSize: Style.font.body
+                    font.pixelSize: root.fontBody
                     elide: Text.ElideRight
                     verticalAlignment: Text.AlignVCenter
                   }
@@ -867,7 +873,7 @@ Item {
                         text: (row.pinned ? "󰐃 " : "") + (row.inStack ? "≡ " : "") + row.previewText
                         color: row.hasCursor ? root.selectedText : root.foreground
                         font.family: root.fontFamily
-                        font.pixelSize: Style.font.title
+                        font.pixelSize: root.fontTitle
                         elide: Text.ElideRight
                         wrapMode: Text.NoWrap
                       }
@@ -881,7 +887,7 @@ Item {
                         color: row.hasCursor ? root.selectedText : root.foreground
                         opacity: 0.62
                         font.family: root.fontFamily
-                        font.pixelSize: Style.font.caption
+                        font.pixelSize: root.fontCaption
                         elide: Text.ElideRight
                       }
                     }
@@ -928,8 +934,8 @@ Item {
 
                 Rectangle {
                   visible: parent.parent.activeRow && parent.parent.activeRow.colorValue
-                  width: Math.min(parent.width, Style.space(160))
-                  height: visible ? Style.space(72) : 0
+                  width: Math.min(parent.width, Style.space(220))
+                  height: visible ? Style.space(96) : 0
                   radius: root.cornerRadius
                   color: (parent.parent.activeRow && parent.parent.activeRow.colorValue) ? parent.parent.activeRow.colorValue : "transparent"
                   border.width: Style.normalBorderWidth
@@ -942,7 +948,7 @@ Item {
                   text: parent.parent.activeRow ? parent.parent.activeRow.fullText : ""
                   color: root.foreground
                   font.family: root.fontFamily
-                  font.pixelSize: Style.font.title
+                  font.pixelSize: root.fontTitle
                   wrapMode: Text.WrapAnywhere
                   elide: Text.ElideRight
                   verticalAlignment: Text.AlignTop
@@ -975,7 +981,7 @@ Item {
               color: root.selectedText
               opacity: 0.8
               font.family: root.fontFamily
-              font.pixelSize: Style.font.displayLarge
+              font.pixelSize: root.fontDisplay
               horizontalAlignment: Text.AlignHCenter
               width: parent.width
             }
@@ -985,7 +991,7 @@ Item {
               color: root.foreground
               opacity: 0.7
               font.family: root.fontFamily
-              font.pixelSize: Style.font.title
+              font.pixelSize: root.fontTitle
               horizontalAlignment: Text.AlignHCenter
               width: parent.width
             }
@@ -999,7 +1005,7 @@ Item {
           color: root.foreground
           opacity: 0.5
           font.family: root.fontFamily
-          font.pixelSize: Style.font.caption
+          font.pixelSize: root.fontCaption
           elide: Text.ElideRight
           verticalAlignment: Text.AlignVCenter
         }
