@@ -3,12 +3,19 @@
 # Captures the current clipboard as a JSON entry on stdout. In watch mode,
 # wl-paste invokes this with the payload on stdin and the mime as $1. Without
 # arguments, it snapshots the current selection itself.
+#
+# Oversize clips are dropped, not truncated: 16 KiB text, 10 MiB per image,
+# 50 MiB image-cache total. Stdin ingest is also time-bounded.
 
 set -o pipefail
 
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy"
 IMAGE_DIR="$STATE_DIR/clipboard-images"
-mkdir -p "$IMAGE_DIR"
+TEXT_MAX=16384
+IMAGE_MAX=10485760
+IMAGE_CACHE_MAX=52428800
+
+mkdir -p -m 700 "$STATE_DIR" "$IMAGE_DIR"
 
 types=$(wl-paste --list-types 2>/dev/null || true)
 
@@ -18,16 +25,34 @@ fi
 
 captured_at=$(date -Iseconds)
 
+read_capped() {
+  local dest="$1" max="$2"
+  if ! timeout 2s head -c "$((max + 1))" >"$dest"; then
+    rm -f "$dest"
+    return 1
+  fi
+  local size
+  size=$(stat -c '%s' -- "$dest" 2>/dev/null) || size=0
+  if (( size == 0 || size > max )); then
+    rm -f "$dest"
+    return 1
+  fi
+  return 0
+}
+
 emit_image() {
   local mime="$1"
-  local ext tmp hash file
+  local ext tmp hash file cache
 
   ext=${mime#image/}
   [[ $ext == jpeg ]] && ext=jpg
 
   tmp=$(mktemp --tmpdir="$IMAGE_DIR" clipboard.XXXXXX) || return 0
-  cat >"$tmp"
-  if [[ ! -s $tmp ]]; then
+  read_capped "$tmp" "$IMAGE_MAX" || return 0
+
+  cache=$(du -sb "$IMAGE_DIR" 2>/dev/null | awk '{print $1}')
+  cache=${cache:-0}
+  if (( cache > IMAGE_CACHE_MAX )); then
     rm -f "$tmp"
     return 0
   fi
@@ -45,8 +70,14 @@ emit_image() {
 }
 
 emit_text() {
+  local tmp
+  tmp=$(mktemp --tmpdir="$STATE_DIR" clipboard-text.XXXXXX) || return 0
+  if ! read_capped "$tmp" "$TEXT_MAX"; then
+    return 0
+  fi
   jq -cRs --arg captured_at "$captured_at" \
-    'select(length > 0) | {type:"text", text:., capturedAt:$captured_at}'
+    'select(length > 0) | {type:"text", text:., capturedAt:$captured_at}' <"$tmp"
+  rm -f "$tmp"
 }
 
 case "${1:-}" in
@@ -62,5 +93,5 @@ for mime in image/png image/jpeg image/webp image/gif image/bmp image/tiff; do
 done
 
 if grep -q '^text/' <<<"$types" || grep -qx 'UTF8_STRING' <<<"$types" || grep -qx 'STRING' <<<"$types"; then
-  wl-paste --type text --no-newline 2>/dev/null | emit_text
+  timeout 2s wl-paste --type text --no-newline 2>/dev/null | emit_text
 fi

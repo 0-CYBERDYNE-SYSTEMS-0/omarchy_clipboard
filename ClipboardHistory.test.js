@@ -95,4 +95,29 @@ test("clear keeps protected when asked", () => {
   assert.strictEqual(cleared[0].text, "saved")
 })
 
+test("normalize drops oversize text and image path", () => {
+  assert.strictEqual(H.normalizeEntry({ type: "text", text: "x".repeat(H.MAX_TEXT_CHARS + 1) }), null)
+  assert.ok(H.normalizeEntry({ type: "text", text: "x".repeat(H.MAX_TEXT_CHARS) }))
+  assert.strictEqual(H.normalizeEntry({
+    type: "image",
+    path: "/" + "a".repeat(H.MAX_PATH_CHARS),
+    mime: "image/png"
+  }), null)
+  assert.ok(H.normalizeEntry({ type: "image", path: "/tmp/a.png", mime: "image/png" }))
+})
+
+test("parseHistory refuses huge json and oversize fields", () => {
+  assert.deepStrictEqual(H.parseHistory("x".repeat(H.MAX_HISTORY_JSON_CHARS + 1)), [])
+  const fat = JSON.stringify([{ type: "text", text: "y".repeat(H.MAX_TEXT_CHARS + 1) }])
+  assert.deepStrictEqual(H.parseHistory(fat), [])
+  const ok = H.parseHistory(JSON.stringify([{ type: "text", text: "ok clip" }]))
+  assert.strictEqual(ok.length, 1)
+  assert.strictEqual(ok[0].text, "ok clip")
+})
+
+test("addEntry drops oversize instead of storing it", () => {
+  const history = H.addEntry([], { type: "text", text: "z".repeat(H.MAX_TEXT_CHARS + 1) }, 10)
+  assert.deepStrictEqual(history, [])
+})
+
 console.log("all tests passed")

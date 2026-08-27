@@ -76,6 +76,8 @@ Indexes are 1-based from the current list. Ids are stable and better for scripts
 
 Stock helpers still work. Extra fields (`id`, `kind`, `pinned`, `snippet`, `board`, `capturedAt`) are additive. Password-manager hints (`x-kde-passwordManagerHint` / `CLIPBOARD_STATE=sensitive`) are skipped.
 
+Payloads are capped at ingest and dropped when oversize, not truncated: 16 KiB of text, 10 MiB per image, 50 MiB image cache. History JSON larger than 4 MiB is refused.
+
 ## Requirements
 
 - Omarchy Quattro (`omarchy-clipboard-paste-text`, `omarchy-clipboard-paste-file`, `omarchy-clipboard-open`)

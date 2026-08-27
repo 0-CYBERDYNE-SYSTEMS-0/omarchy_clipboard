@@ -1,3 +1,14 @@
+var MAX_ENTRIES = 300
+var MAX_TEXT_CHARS = 16384
+var MAX_PATH_CHARS = 4096
+var MAX_MIME_CHARS = 128
+var MAX_ID_CHARS = 128
+var MAX_BOARD_CHARS = 64
+var MAX_KIND_CHARS = 32
+var MAX_CAPTURED_CHARS = 64
+var MAX_HISTORY_JSON_CHARS = 4 * 1024 * 1024
+var MAX_STATE_JSON_CHARS = 256 * 1024
+
 function pad2(n) {
   return (n < 10 ? "0" : "") + n
 }
@@ -94,30 +105,42 @@ function normalizeEntry(value) {
 
   if (type === "text") {
     var text = String(value.text || "")
-    if (text.trim().length === 0) return null
+    if (text.trim().length === 0 || text.length > MAX_TEXT_CHARS) return null
     entry = { type: "text", text: text }
   } else if (type === "image") {
     var path = String(value.path || "")
-    if (!path) return null
+    var mime = String(value.mime || "image/png")
+    if (!path || path.length > MAX_PATH_CHARS || mime.length > MAX_MIME_CHARS) return null
     entry = {
       type: "image",
       path: path,
-      mime: String(value.mime || "image/png")
+      mime: mime
     }
   } else {
     return null
   }
 
-  if (value.capturedAt !== undefined && value.capturedAt !== null && String(value.capturedAt).length > 0)
-    entry.capturedAt = String(value.capturedAt)
-  if (value.id) entry.id = String(value.id)
+  if (value.capturedAt !== undefined && value.capturedAt !== null) {
+    var capturedAt = String(value.capturedAt)
+    if (capturedAt.length > 0 && capturedAt.length <= MAX_CAPTURED_CHARS)
+      entry.capturedAt = capturedAt
+  }
+  if (value.id) {
+    var id = String(value.id)
+    if (id.length > 0 && id.length <= MAX_ID_CHARS) entry.id = id
+  }
   if (value.pinned === true || value.pinned === "true") entry.pinned = true
   if (value.snippet === true || value.snippet === "true") entry.snippet = true
-  if (value.board) entry.board = String(value.board)
+  if (value.board) {
+    var board = String(value.board)
+    if (board.length > 0 && board.length <= MAX_BOARD_CHARS) entry.board = board
+  }
 
   if (entry.snippet) entry.kind = "snippet"
-  else if (value.kind && String(value.kind) !== "snippet") entry.kind = String(value.kind)
-  else entry.kind = detectKind(entry)
+  else if (value.kind && String(value.kind) !== "snippet") {
+    var kind = String(value.kind)
+    entry.kind = kind.length <= MAX_KIND_CHARS ? kind : detectKind(entry)
+  } else entry.kind = detectKind(entry)
 
   if (entry.snippet) {
     entry.pinned = true
@@ -136,15 +159,18 @@ function entryKey(entry) {
 
 function parseHistory(raw) {
   try {
-    var parsed = JSON.parse(String(raw || "[]"))
+    var source = String(raw || "[]")
+    if (source.length > MAX_HISTORY_JSON_CHARS) return []
+    var parsed = JSON.parse(source)
     var next = []
     if (!Array.isArray(parsed)) return next
 
-    for (var i = 0; i < parsed.length; i++) {
+    var cap = Math.min(parsed.length, MAX_ENTRIES * 2)
+    for (var i = 0; i < cap; i++) {
       var entry = normalizeEntry(parsed[i])
       if (entry) next.push(entry)
     }
-    return next
+    return trimHistory(next, MAX_ENTRIES)
   } catch (e) {
     return []
   }
@@ -155,9 +181,9 @@ function isProtected(entry) {
 }
 
 function trimHistory(history, limit) {
-  var max = limit === undefined || limit === null ? 100 : Number(limit)
-  if (isNaN(max)) max = 100
-  max = Math.max(0, max)
+  var max = limit === undefined || limit === null ? MAX_ENTRIES : Number(limit)
+  if (isNaN(max)) max = MAX_ENTRIES
+  max = Math.max(0, Math.min(MAX_ENTRIES, max))
 
   var values = Array.isArray(history) ? history : []
   var kept = []
@@ -277,7 +303,7 @@ function setSnippet(history, index, snippet) {
 function setBoard(history, index, board) {
   return updateEntryAt(history, index, function(entry) {
     var name = String(board || "").trim()
-    if (name && name !== "inbox" && name !== "all") entry.board = name
+    if (name && name !== "inbox" && name !== "all" && name.length <= MAX_BOARD_CHARS) entry.board = name
     else delete entry.board
     return entry
   })
@@ -375,22 +401,24 @@ function colorValue(entry) {
 
 function parseState(raw) {
   try {
-    var parsed = JSON.parse(String(raw || "{}"))
+    var source = String(raw || "{}")
+    if (source.length > MAX_STATE_JSON_CHARS) return { boards: [], stack: [] }
+    var parsed = JSON.parse(source)
     if (!parsed || typeof parsed !== "object") parsed = {}
     var boards = []
     var seen = {}
-    var source = Array.isArray(parsed.boards) ? parsed.boards : []
-    for (var i = 0; i < source.length; i++) {
-      var name = String(source[i] || "").trim()
-      if (!name || name === "all" || name === "inbox" || seen[name]) continue
+    var boardSource = Array.isArray(parsed.boards) ? parsed.boards : []
+    for (var i = 0; i < boardSource.length && boards.length < 64; i++) {
+      var name = String(boardSource[i] || "").trim()
+      if (!name || name.length > MAX_BOARD_CHARS || name === "all" || name === "inbox" || seen[name]) continue
       seen[name] = true
       boards.push(name)
     }
     var stack = []
     var stackSource = Array.isArray(parsed.stack) ? parsed.stack : []
-    for (var j = 0; j < stackSource.length; j++) {
+    for (var j = 0; j < stackSource.length && stack.length < MAX_ENTRIES; j++) {
       var id = String(stackSource[j] || "")
-      if (id) stack.push(id)
+      if (id && id.length <= MAX_ID_CHARS) stack.push(id)
     }
     return { boards: boards, stack: stack }
   } catch (e) {
@@ -549,6 +577,11 @@ function displayRows(history, query, limit, options) {
 
 if (typeof module !== "undefined") {
   module.exports = {
+    MAX_ENTRIES: MAX_ENTRIES,
+    MAX_TEXT_CHARS: MAX_TEXT_CHARS,
+    MAX_PATH_CHARS: MAX_PATH_CHARS,
+    MAX_HISTORY_JSON_CHARS: MAX_HISTORY_JSON_CHARS,
+    MAX_STATE_JSON_CHARS: MAX_STATE_JSON_CHARS,
     normalizeEntry: normalizeEntry,
     entryKey: entryKey,
     parseHistory: parseHistory,
