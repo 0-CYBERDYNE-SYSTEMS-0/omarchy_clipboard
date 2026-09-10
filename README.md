@@ -76,7 +76,7 @@ Indexes are 1-based from the current list. Ids are stable and better for scripts
 
 Stock helpers still work. Extra fields (`id`, `kind`, `pinned`, `snippet`, `board`, `capturedAt`) are additive. Password-manager hints (`x-kde-passwordManagerHint` / `CLIPBOARD_STATE=sensitive`) are skipped.
 
-Payloads are capped at ingest and dropped when oversize, not truncated: 16 KiB of text, 10 MiB per image, 50 MiB image cache. History JSON larger than 4 MiB is refused.
+Payloads are capped at ingest and dropped when oversize, not truncated: 16 KiB of text, 10 MiB per image, 50 MiB image cache. History JSON larger than 4 MiB is refused. `wl-paste --list-types` is time- and byte-bounded (2s / 4 KiB) and fails closed. State files are opened `O_NOFOLLOW|O_NONBLOCK` so a planted FIFO cannot stall the CLI before `fstat`.
 
 ## Requirements
 

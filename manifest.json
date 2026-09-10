@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.0-cyberdyne-systems-0.clipboard",
   "name": "Clipboard",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "author": "0-CYBERDYNE-SYSTEMS-0",
   "license": "MIT",
   "description": "Clipboard history with search, pins, boards, snippets, typed cards, and a stack.",

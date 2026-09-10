@@ -12,6 +12,7 @@ const EXTRAS_PATH = path.join(STATE_DIR, "clipboard-extras.json")
 const MAX_HISTORY_BYTES = 4 * 1024 * 1024
 const MAX_EXTRAS_BYTES = 256 * 1024
 const NOFOLLOW = fs.constants.O_NOFOLLOW || 0
+const NONBLOCK = fs.constants.O_NONBLOCK || 0
 
 function usage() {
   console.log(`Usage:
@@ -44,7 +45,7 @@ function closeFd(fd) {
 function readJson(file, fallback, maxBytes) {
   let fd
   try {
-    fd = fs.openSync(file, fs.constants.O_RDONLY | NOFOLLOW)
+    fd = fs.openSync(file, fs.constants.O_RDONLY | NOFOLLOW | NONBLOCK)
     const st = fs.fstatSync(fd)
     if (!st.isFile() || st.size > maxBytes) {
       closeFd(fd)

@@ -17,7 +17,21 @@ IMAGE_CACHE_MAX=52428800
 
 mkdir -p -m 700 "$STATE_DIR" "$IMAGE_DIR"
 
-types=$(wl-paste --list-types 2>/dev/null || true)
+# Application-controlled MIME lists can hang or flood. Bound the producer
+# itself and fail closed on timeout or overflow.
+TYPES_MAX=4096
+types_tmp=$(mktemp --tmpdir="$STATE_DIR" clipboard-types.XXXXXX) || exit 0
+if ! timeout 2s wl-paste --list-types 2>/dev/null | head -c "$((TYPES_MAX + 1))" >"$types_tmp"; then
+  rm -f "$types_tmp"
+  exit 0
+fi
+types_size=$(stat -c '%s' -- "$types_tmp" 2>/dev/null) || types_size=0
+if (( types_size == 0 || types_size > TYPES_MAX )); then
+  rm -f "$types_tmp"
+  exit 0
+fi
+types=$(<"$types_tmp")
+rm -f "$types_tmp"
 
 if [[ ${CLIPBOARD_STATE:-} == "sensitive" ]] || grep -qx 'x-kde-passwordManagerHint' <<<"$types"; then
   exit 0
